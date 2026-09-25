@@ -36,10 +36,24 @@ export async function api<T = any>(path: string, options: ApiOptions = {}): Prom
 
   const data = await res.json().catch(() => null);
 
-  if (!res.ok) {
-    const message = data?.error?.formErrors?.[0] || data?.error || `HTTP ${res.status}`;
-    throw new Error(typeof message === "string" ? message : JSON.stringify(message));
+if (!res.ok) {
+  let message = `HTTP ${res.status}`;
+  if (typeof data?.error === "string") {
+    message = data.error;
+  } else if (data?.error?.fieldErrors) {
+    // Flatten Zod field errors into "field: message" lines
+    const parts: string[] = [];
+    for (const [field, msgs] of Object.entries(data.error.fieldErrors)) {
+      if (Array.isArray(msgs) && msgs.length) {
+        parts.push(`${field}: ${msgs.join(", ")}`);
+      }
+    }
+    if (parts.length) message = parts.join(" · ");
+  } else if (Array.isArray(data?.error?.formErrors) && data.error.formErrors.length) {
+    message = data.error.formErrors.join(" · ");
   }
+  throw new Error(message);
+}
 
   return data as T;
 }

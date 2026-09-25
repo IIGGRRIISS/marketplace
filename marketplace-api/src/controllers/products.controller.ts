@@ -19,7 +19,14 @@ const createProductSchema = z.object({
   variants: z.array(variantSchema).optional(),
 });
 
-const updateProductSchema = createProductSchema.partial();
+// Update schema: only direct Product fields — no `variants`
+// (variant editing would need nested create/update/delete ops, which we don't implement)
+const updateProductSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  price: z.number().int().min(0).optional(),
+  imageUrl: z.string().url().nullable().optional(),
+});
 
 // ---------- Helpers ----------
 
@@ -66,7 +73,7 @@ export async function listProducts(req: Request, res: Response) {
 
   const products = await prisma.product.findMany({
     where: {
-      ...(q ? { title: { contains: String(q), mode: "insensitive" } } : {}),
+      ...(q ? { title: { contains: String(q), mode: "insensitive" as const } } : {}),
       ...(minPrice || maxPrice
         ? {
             price: {
@@ -87,7 +94,7 @@ export async function listProducts(req: Request, res: Response) {
 // GET /api/products/:id  (public)
 export async function getProduct(req: Request, res: Response) {
   const product = await prisma.product.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
     include: {
       variants: true,
       seller: { select: { storeName: true, bio: true } },
@@ -116,7 +123,9 @@ export async function updateProduct(req: AuthRequest, res: Response) {
   const seller = await getSellerOrFail(req.user!.userId, res);
   if (!seller) return;
 
-  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+  const product = await prisma.product.findUnique({
+    where: { id: String(req.params.id) },
+  });
   if (!product) return res.status(404).json({ error: "Not found" });
   if (product.sellerId !== seller.id) {
     return res.status(403).json({ error: "Not your product" });
@@ -140,7 +149,9 @@ export async function deleteProduct(req: AuthRequest, res: Response) {
   const seller = await getSellerOrFail(req.user!.userId, res);
   if (!seller) return;
 
-  const product = await prisma.product.findUnique({ where: { id: req.params.id } });
+  const product = await prisma.product.findUnique({
+    where: { id: String(req.params.id) },
+  });
   if (!product) return res.status(404).json({ error: "Not found" });
   if (product.sellerId !== seller.id) {
     return res.status(403).json({ error: "Not your product" });

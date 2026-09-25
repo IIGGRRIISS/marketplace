@@ -8,7 +8,6 @@ export async function checkout(req: AuthRequest, res: Response) {
 
   try {
     const order = await prisma.$transaction(async (tx) => {
-      // 1. Load cart with product/variant data
       const cart = await tx.cartItem.findMany({
         where: { userId },
         include: { product: true, variant: true },
@@ -18,7 +17,6 @@ export async function checkout(req: AuthRequest, res: Response) {
         throw new Error("CART_EMPTY");
       }
 
-      // 2. Validate stock and compute total
       let total = 0;
       for (const item of cart) {
         const unitPrice = item.product.price + (item.variant?.priceDelta ?? 0);
@@ -31,7 +29,6 @@ export async function checkout(req: AuthRequest, res: Response) {
         total += unitPrice * item.quantity;
       }
 
-      // 3. Create order
       const created = await tx.order.create({
         data: {
           userId,
@@ -48,7 +45,6 @@ export async function checkout(req: AuthRequest, res: Response) {
         include: { items: true },
       });
 
-      // 4. Decrement stock on variants
       for (const item of cart) {
         if (item.variant) {
           await tx.productVariant.update({
@@ -58,7 +54,6 @@ export async function checkout(req: AuthRequest, res: Response) {
         }
       }
 
-      // 5. Clear cart
       await tx.cartItem.deleteMany({ where: { userId } });
 
       return created;
@@ -95,7 +90,7 @@ export async function myOrders(req: AuthRequest, res: Response) {
 // GET /api/orders/:id
 export async function getOrder(req: AuthRequest, res: Response) {
   const order = await prisma.order.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
     include: {
       items: {
         include: { product: { select: { title: true, imageUrl: true } } },

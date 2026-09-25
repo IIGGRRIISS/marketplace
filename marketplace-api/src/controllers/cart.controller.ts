@@ -81,7 +81,7 @@ export async function updateCartItem(req: AuthRequest, res: Response) {
   const { quantity } = parsed.data;
 
   const item = await prisma.cartItem.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
   });
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.userId !== req.user!.userId) {
@@ -103,7 +103,7 @@ export async function updateCartItem(req: AuthRequest, res: Response) {
 // DELETE /api/cart/:id
 export async function removeCartItem(req: AuthRequest, res: Response) {
   const item = await prisma.cartItem.findUnique({
-    where: { id: req.params.id },
+    where: { id: String(req.params.id) },
   });
   if (!item) return res.status(404).json({ error: "Not found" });
   if (item.userId !== req.user!.userId) {
